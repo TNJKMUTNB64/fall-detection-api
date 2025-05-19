@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify
 import numpy as np
-from tflite_runtime.interpreter import Interpreter
+import tensorflow.lite as tflite
 
 app = Flask(__name__)
 
 # โหลดโมเดล TFLite
-interpreter = Interpreter(model_path="fall_detection_model.tflite")
+interpreter = tflite.Interpreter(model_path="fall_detection_model.tflite")
 interpreter.allocate_tensors()
 
 input_details = interpreter.get_input_details()
@@ -18,19 +18,17 @@ def predict():
         if not data or len(data) != 3:
             return jsonify({"error": "Invalid input format. Expecting 3 values."}), 400
 
-        # เตรียม input shape (50 timestep × 3 axis)
+        # เตรียม input shape (ซ้ำ 50 timestep)
         time_steps = 50
         input_sequence = np.tile(data, (time_steps, 1)).astype(np.float32)
         input_array = input_sequence.reshape(1, time_steps, 3)
 
-        # รันโมเดล
         interpreter.set_tensor(input_details[0]['index'], input_array)
         interpreter.invoke()
         output = interpreter.get_tensor(output_details[0]['index'])
 
         result = "Fall" if output[0][0] > 0.75 else "No Fall"
         return jsonify(result)
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
